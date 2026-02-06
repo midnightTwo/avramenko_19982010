@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Himarra — Code Access</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0a0a'/><text x='50' y='68' font-size='60' font-family='Arial' font-weight='900' text-anchor='middle' fill='%23fff'>H</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #060606;
+            --surface: #0e0e0e;
+            --surface-2: #141414;
+            --surface-3: #1a1a1a;
+            --border: rgba(255,255,255,.06);
+            --border-hover: rgba(255,255,255,.12);
+            --text: #eaeaea;
+            --text-2: #999;
+            --text-3: #555;
+            --accent: #c8b6ff;
+            --accent-dim: rgba(200,182,255,.08);
+            --accent-glow: rgba(200,182,255,.12);
+            --green: #4ade80;
+            --green-dim: rgba(74,222,128,.08);
+            --red: #f87171;
+            --radius: 16px;
+            --radius-sm: 12px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── 3D Canvas Background ─────────────────────────── */
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: .6;
+        }
+
+        /* ── Grain overlay ────────────────────────────────── */
+        .grain {
+            position: fixed; inset: 0; z-index: 1;
+            pointer-events: none;
+            opacity: .03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* ── Subtle vignette ──────────────────────────────── */
+        .vignette {
+            position: fixed; inset: 0; z-index: 1;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.5) 100%);
+        }
+
+        /* ── Main Layout ──────────────────────────────────── */
+        .wrapper {
+            position: relative;
+            z-index: 2;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 20px 20px 80px;
+        }
+
+        /* ── Header ───────────────────────────────────────── */
+        header {
+            text-align: center;
+            padding: 60px 0 48px;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .brand-mark {
+            width: 44px; height: 44px;
+            background: #fff;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--bg);
+            transition: transform .3s, box-shadow .3s;
+        }
+        .brand-mark:hover {
+            transform: rotate(-6deg) scale(1.05);
+            box-shadow: 0 0 30px rgba(255,255,255,.08);
+        }
+        .brand-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 26px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -.5px;
+        }
+
+        .tagline {
+            color: var(--text-2);
+            font-size: 15px;
+            line-height: 1.7;
+            max-width: 380px;
+            margin: 0 auto;
+            font-weight: 400;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text-2);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 100px;
+            margin-bottom: 20px;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+        }
+        .tag .pulse {
+            width: 6px; height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .3; }
+        }
+
+        /* ── Card ─────────────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: border-color .3s, box-shadow .4s;
+        }
+        .card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 20px 60px rgba(0,0,0,.4);
+        }
+
+        .card-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .avatar {
+            width: 42px; height: 42px;
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .meta { flex: 1; min-width: 0; }
+        .meta-email {
+            font-weight: 600;
+            font-size: 14px;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .meta-status {
+            font-size: 12px;
+            color: var(--text-3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+        }
+        .meta-status .dot {
+            width: 6px; height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+        }
+
+        .card-body {
+            padding: 20px 24px 24px;
+        }
+
+        /* ── Button ───────────────────────────────────────── */
+        .btn {
+            width: 100%;
+            padding: 13px 20px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            color: #fff;
+            background: var(--surface-2);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all .25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:hover {
+            background: var(--surface-3);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
+        }
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn .spinner {
+            display: none;
+            width: 14px; height: 14px;
+            border: 2px solid var(--text-3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+        }
+        .btn.loading .spinner { display: block; }
+        .btn.loading .btn-text { opacity: .6; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .btn svg { width: 15px; height: 15px; opacity: .5; }
+
+        /* ── Results ──────────────────────────────────────── */
+        .results { margin-top: 16px; }
+
+        .email-row {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+            animation: slideIn .35s ease forwards;
+            opacity: 0;
+        }
+        .email-row:last-child { border-bottom: none; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .email-subj {
+            font-weight: 600;
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.5;
+        }
+        .email-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-3);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ── Code Display ─────────────────────────────────── */
+        .codes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .code {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--green-dim);
+            border: 1px solid rgba(74,222,128,.15);
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all .2s ease;
+            letter-spacing: 4px;
+            position: relative;
+            user-select: none;
+        }
+        .code:hover {
+            background: rgba(74,222,128,.12);
+            border-color: rgba(74,222,128,.3);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74,222,128,.1);
+        }
+        .code:active { transform: scale(.97); }
+
+        .code .ico {
+            width: 16px; height: 16px;
+            opacity: .4;
+            transition: opacity .2s;
+        }
+        .code:hover .ico { opacity: .7; }
+
+        .code.done {
+            border-color: rgba(200,182,255,.3);
+            color: var(--accent);
+            background: var(--accent-dim);
+        }
+        .code.done::after {
+            content: 'Copied';
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--surface-2);
+            border: 1px solid rgba(200,182,255,.15);
+            padding: 3px 10px;
+            border-radius: 6px;
+            letter-spacing: 0;
+            animation: slideIn .25s ease;
+            white-space: nowrap;
+        }
+
+        .no-code {
+            font-size: 12px;
+            color: var(--text-3);
+            margin-top: 8px;
+        }
+
+        /* ── Error / Empty ────────────────────────────────── */
+        .err {
+            background: rgba(248,113,113,.06);
+            border: 1px solid rgba(248,113,113,.12);
+            color: var(--red);
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 36px 20px;
+            color: var(--text-3);
+            font-size: 13px;
+        }
+        .empty svg {
+            width: 40px; height: 40px;
+            margin-bottom: 10px;
+            opacity: .15;
+        }
+
+        /* ── Footer ───────────────────────────────────────── */
+        footer {
+            margin-top: 56px;
+            text-align: center;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+        footer p {
+            color: var(--text-3);
+            font-size: 12px;
+        }
+        footer a {
+            color: var(--text-2);
+            text-decoration: none;
+            transition: color .2s;
+        }
+        footer a:hover { color: #fff; }
+
+        /* ── Toast ────────────────────────────────────────── */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(60px);
+            background: var(--surface-2);
+            border: 1px solid var(--border-hover);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0;
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            box-shadow: 0 12px 40px rgba(0,0,0,.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast .check {
+            color: var(--green);
+        }
+
+        /* ── Skeleton ─────────────────────────────────────── */
+        .skel {
+            background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.8s infinite;
+            border-radius: 6px;
+        }
+        @keyframes shimmer { to { background-position: -200% 0; } }
+        .skel-row { padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .skel-line { height: 12px; margin-bottom: 8px; border-radius: 4px; }
+        .skel-line.s1 { width: 75%; }
+        .skel-line.s2 { width: 45%; }
+
+        /* ── Scrollbar ────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); border-radius: 10px; }
+
+        /* ── Responsive ───────────────────────────────────── */
+        @media (max-width: 500px) {
+            .wrapper { padding: 14px 14px 60px; }
+            header { padding: 44px 0 36px; }
+            .brand-name { font-size: 22px; }
+            .card-top { padding: 18px 18px; }
+            .card-body { padding: 16px 18px 20px; }
+            .code { font-size: 17px; padding: 8px 16px; letter-spacing: 3px; }
+            .meta-email { font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <div class="wrapper">
+        <header>
+            <div class="tag"><span class="pulse"></span> Secure</div>
+            <div class="brand">
+                <div class="brand-mark">H</div>
+                <span class="brand-name">Himarra</span>
+            </div>
+            <p class="tagline">Retrieve your verification codes instantly.<br>One click — copied to clipboard.</p>
+        </header>
+
+        {% for acc in accounts %}
+        <div class="card">
+            <div class="card-top">
+                <div class="avatar">{{ acc.email[0]|upper }}</div>
+                <div class="meta">
+                    <div class="meta-email">{{ acc.email }}</div>
+                    <div class="meta-status">
+                        <span class="dot"></span> Connected
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <button class="btn" onclick="fetchEmails({{ loop.index0 }}, this)">
+                    <span class="spinner"></span>
+                    <span class="btn-text">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Fetch Codes
+                    </span>
+                </button>
+                <div class="results" id="results-{{ loop.index0 }}">
+                    <div class="empty">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <p>Press fetch to load codes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <footer>
+            <p>&copy; 2026 <a href="#">Himarra</a> &mdash; All rights reserved</p>
+        </footer>
+    </div>
+
+    <div class="toast" id="toast">
+        <span class="check">&#10003;</span>
+        <span id="toast-text">Copied</span>
+    </div>
+
+    <script>
+    // ══════════════════════════════════════════════════════════
+    // THREE.JS — 3D Wireframe Terrain Background
+    // ══════════════════════════════════════════════════════════
+    (function() {
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, .1, 1000);
+        camera.position.set(0, 3, 6);
+        camera.lookAt(0, 0, 0);
+
+        // Wireframe plane (terrain)
+        const planeGeo = new THREE.PlaneGeometry(30, 30, 60, 60);
+        const planeMat = new THREE.MeshBasicMaterial({
+            color: 0x1a1a2e,
+            wireframe: true,
+            transparent: true,
+            opacity: .15
+        });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2.5;
+        plane.position.y = -2;
+        scene.add(plane);
+
+        // Floating icosahedron
+        const icoGeo = new THREE.IcosahedronGeometry(1.2, 1);
+        const icoMat = new THREE.MeshBasicMaterial({
+            color: 0xc8b6ff,
+            wireframe: true,
+            transparent: true,
+            opacity: .12
+        });
+        const ico = new THREE.Mesh(icoGeo, icoMat);
+        ico.position.set(0, .5, 0);
+        scene.add(ico);
+
+        // Torus knot
+        const tkGeo = new THREE.TorusKnotGeometry(.6, .15, 80, 12, 2, 3);
+        const tkMat = new THREE.MeshBasicMaterial({
+            color: 0x4ade80,
+            wireframe: true,
+            transparent: true,
+            opacity: .06
+        });
+        const tk = new THREE.Mesh(tkGeo, tkMat);
+        tk.position.set(3, 1, -2);
+        scene.add(tk);
+
+        // Small floating spheres
+        const spheres = [];
+        for (let i = 0; i < 8; i++) {
+            const sGeo = new THREE.SphereGeometry(.08, 8, 8);
+            const sMat = new THREE.MeshBasicMaterial({
+                color: [0xc8b6ff, 0x4ade80, 0xffffff, 0xf87171][i % 4],
+                transparent: true,
+                opacity: .25
+            });
+            const s = new THREE.Mesh(sGeo, sMat);
+            s.position.set(
+                (Math.random() - .5) * 10,
+                (Math.random() - .5) * 4 + 1,
+                (Math.random() - .5) * 6
+            );
+            s.userData = {
+                speed: Math.random() * .005 + .002,
+                amp: Math.random() * 1.5 + .5,
+                offset: Math.random() * Math.PI * 2
+            };
+            scene.add(s);
+            spheres.push(s);
+        }
+
+        // Animate terrain
+        const posAttr = planeGeo.getAttribute('position');
+        const origY = new Float32Array(posAttr.count);
+        for (let i = 0; i < posAttr.count; i++) origY[i] = posAttr.getY(i);
+
+        let mouse = { x: 0, y: 0 };
+        document.addEventListener('mousemove', e => {
+            mouse.x = (e.clientX / window.innerWidth - .5) * 2;
+            mouse.y = (e.clientY / window.innerHeight - .5) * 2;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = performance.now() * .001;
+
+            // Terrain wave
+            for (let i = 0; i < posAttr.count; i++) {
+                const x = posAttr.getX(i);
+                const z = posAttr.getZ(i);
+                posAttr.setY(i, origY[i] + Math.sin(x * .4 + t * .6) * Math.cos(z * .4 + t * .4) * .4);
+            }
+            posAttr.needsUpdate = true;
+
+            // Rotate objects
+            ico.rotation.x = t * .15;
+            ico.rotation.y = t * .2;
+            ico.position.y = .5 + Math.sin(t * .5) * .3;
+
+            tk.rotation.x = t * .1;
+            tk.rotation.z = t * .15;
+
+            // Float spheres
+            spheres.forEach(s => {
+                const d = s.userData;
+                s.position.y += Math.sin(t * 2 + d.offset) * d.speed;
+            });
+
+            // Camera responds to mouse
+            camera.position.x += (mouse.x * 1.5 - camera.position.x) * .02;
+            camera.position.y += (-mouse.y * .5 + 3 - camera.position.y) * .02;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    })();
+
+    // ══════════════════════════════════════════════════════════
+    // App Logic
+    // ══════════════════════════════════════════════════════════
+    async function fetchEmails(idx, btn) {
+        const el = document.getElementById('results-' + idx);
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        el.innerHTML = `
+            <div class="skel-row"><div class="skel-line s1 skel"></div><div class="skel-line s2 skel"></div></div>
+            <div class="skel-row"><div class="skel-line s1 skel"></div><div class="skel-line s2 skel"></div></div>
+        `;
+
+        try {
+            const res = await fetch('/api/emails/' + idx);
+            const data = await res.json();
+
+            if (data.error) {
+                el.innerHTML = `<div class="err">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                    </svg>
+                    ${esc(data.error)}
+                </div>`;
+            } else if (!data.emails?.length) {
+                el.innerHTML = `<div class="empty"><p>No emails found</p></div>`;
+            } else {
+                el.innerHTML = data.emails.map((em, i) => `
+                    <div class="email-row" style="animation-delay:${i * 60}ms">
+                        <div class="email-subj">${esc(em.subject || '(No subject)')}</div>
+                        <div class="email-info">
+                            <span>${esc(em.from)}</span>
+                            <span>${esc(em.date)}</span>
+                        </div>
+                        ${em.codes?.length
+                            ? `<div class="codes">${em.codes.map(c => `
+                                <div class="code" onclick="copy('${c}',this)">
+                                    ${c}
+                                    <svg class="ico" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>`).join('')}
+                            </div>`
+                            : `<p class="no-code">No codes detected</p>`}
+                    </div>
+                `).join('');
+            }
+        } catch {
+            el.innerHTML = `<div class="err">Connection failed. Try again.</div>`;
+        }
+
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+
+    async function copy(code, el) {
+        try { await navigator.clipboard.writeText(code); }
+        catch {
+            const t = document.createElement('textarea');
+            t.value = code; t.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(t); t.select();
+            document.execCommand('copy'); document.body.removeChild(t);
+        }
+        el.classList.add('done');
+        toast('Copied — ' + code);
+        setTimeout(() => el.classList.remove('done'), 2000);
+    }
+
+    function toast(msg) {
+        const t = document.getElementById('toast');
+        document.getElementById('toast-text').textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function esc(s) {
+        const m = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
+        return String(s).replace(/[&<>"']/g, c => m[c]);
+    }
+    </script>
+</body>
+</html>
