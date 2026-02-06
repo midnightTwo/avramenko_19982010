@@ -51,9 +51,9 @@ def get_access_token(account):
 
 
 def generate_oauth2_string(user, token):
-    """Build XOAUTH2 SASL string."""
+    """Build XOAUTH2 SASL string (raw bytes, not base64)."""
     auth_string = f"user={user}\x01auth=Bearer {token}\x01\x01"
-    return base64.b64encode(auth_string.encode()).decode()
+    return auth_string.encode()
 
 
 def decode_mime_words(s):
@@ -107,8 +107,8 @@ def fetch_latest_emails(account, count=5):
 
     try:
         mail = imaplib.IMAP4_SSL("outlook.office365.com", 993)
-        auth_string = generate_oauth2_string(account["email"], token)
-        mail.authenticate("XOAUTH2", lambda x: auth_string.encode())
+        auth_bytes = generate_oauth2_string(account["email"], token)
+        mail.authenticate("XOAUTH2", lambda x: auth_bytes)
         mail.select("INBOX")
 
         status, messages = mail.search(None, "ALL")
